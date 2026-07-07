@@ -25,21 +25,6 @@ current state of that record on that branch.
 composer require richardhulbert/revisions-model
 ```
 
-While the package is unpublished, require it as a path repository in your
-app's `composer.json`:
-
-```json
-{
-    "repositories": [
-        { "type": "path", "url": "../RevsionsModel" }
-    ]
-}
-```
-
-```bash
-composer require richardhulbert/revisions-model:@dev
-```
-
 The service provider is auto-discovered. Publish the config if you need to
 change any defaults:
 
