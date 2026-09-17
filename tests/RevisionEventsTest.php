@@ -5,7 +5,8 @@ namespace RichardHulbert\Revisions\Tests;
 use RichardHulbert\Revisions\Tests\Fixtures\Post;
 
 /**
- * Pins the model events new() and update() fire, and the state listeners see.
+ * Pins the model events new(), update() and delete() fire, and the state
+ * listeners see.
  *
  * new() writes the row, then sets prime once the id exists. Listeners must
  * only ever see the finished row: a listener reading ->prime on the first
@@ -16,12 +17,14 @@ class RevisionEventsTest extends TestCase
 {
     private const EVENTS = ['saving', 'creating', 'created', 'updating', 'updated', 'saved'];
 
+    private const DELETE_EVENTS = ['deleting', 'trashed', 'deleted'];
+
     /** @var array<int, array{event: string, id: mixed, prime: mixed}> */
     private array $fired = [];
 
-    private function recordPostEvents(): void
+    private function recordPostEvents(array $events = self::EVENTS): void
     {
-        foreach (self::EVENTS as $event) {
+        foreach ($events as $event) {
             Post::registerModelEvent($event, function (Post $post) use ($event) {
                 $this->fired[] = [
                     'event' => $event,
@@ -107,5 +110,64 @@ class RevisionEventsTest extends TestCase
         }
         $this->assertSame($revision->id, $this->fired[3]['id']);
         $this->assertTrue($revision->wasRecentlyCreated);
+    }
+
+    public function test_deleting_the_prime_fires_the_delete_events_on_it(): void
+    {
+        $post = Post::new(['title' => 'v1']);
+        $this->recordPostEvents(self::DELETE_EVENTS);
+
+        $this->assertTrue($post->delete());
+
+        $this->assertSame(['deleting', 'trashed', 'deleted'], $this->firedEvents());
+        $this->assertSame([$post->id], array_unique(array_column($this->fired, 'id')));
+    }
+
+    /**
+     * delete() on a later revision once bulk-deleted the prime row with a
+     * query, which fires no model events: listeners never heard that the
+     * chain was deleted, so Scout, for one, never removed it from its index.
+     */
+    public function test_deleting_through_a_later_revision_fires_the_delete_events_on_the_prime_row(): void
+    {
+        $this->actingAsUserOnBranch(2);
+        $post = Post::new(['title' => 'v1']);
+        $revision = $post->update(['title' => 'v2']);
+        $this->recordPostEvents(self::DELETE_EVENTS);
+
+        $deleted = $revision->delete();
+
+        $this->assertSame(['deleting', 'trashed', 'deleted'], $this->firedEvents());
+        $this->assertSame([$post->id], array_unique(array_column($this->fired, 'id')), 'the events fired on a row other than the prime');
+        $this->assertSoftDeleted('posts', ['id' => $post->id]);
+        $this->assertNotSoftDeleted('posts', ['id' => $revision->id]);
+        $this->assertTrue($deleted);
+    }
+
+    public function test_a_deleting_listener_can_stop_a_delete_through_a_later_revision(): void
+    {
+        $this->actingAsUserOnBranch(2);
+        $post = Post::new(['title' => 'v1']);
+        $revision = $post->update(['title' => 'v2']);
+        Post::deleting(fn () => false);
+
+        $deleted = $revision->delete();
+
+        $this->assertNotSoftDeleted('posts', ['id' => $post->id]);
+        $this->assertFalse($deleted);
+    }
+
+    public function test_deleting_through_a_revision_of_an_already_deleted_chain_fires_nothing(): void
+    {
+        $this->actingAsUserOnBranch(2);
+        $post = Post::new(['title' => 'v1']);
+        $revision = $post->update(['title' => 'v2']);
+        $post->delete();
+        $this->recordPostEvents(self::DELETE_EVENTS);
+
+        $this->assertNull($revision->delete());
+
+        $this->assertSame([], $this->fired);
+        $this->assertNotSoftDeleted('posts', ['id' => $revision->id]);
     }
 }

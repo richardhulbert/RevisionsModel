@@ -245,7 +245,14 @@ abstract class RevisionsModel extends Model
     }
 
     /**
-     * Deleting any revision deletes the prime record of the chain.
+     * Deleting any revision deletes the prime record of the chain, as a
+     * model: `deleting` and `deleted` (and `trashed`, with soft deletes) fire
+     * on the prime row whichever revision this is called on, and a `deleting`
+     * listener can stop it. The chain's other revisions are left untouched.
+     *
+     * @return bool|null false if a listener stopped it, null if the prime row
+     *                   is already gone (as Eloquent returns for a model that
+     *                   no longer exists)
      */
     public function delete()
     {
@@ -254,7 +261,9 @@ abstract class RevisionsModel extends Model
             return parent::delete();
         }
 
-        return static::whereKey($this->prime)->delete();
+        // load the prime rather than deleting it with a query: a query fires
+        // no model events, so listeners (Scout, say) never hear of the delete
+        return static::whereKey($this->prime)->first()?->delete();
     }
 
     /**

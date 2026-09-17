@@ -144,6 +144,15 @@ deletes, this marks the whole record as deleted without losing history):
 $revision->delete();
 ```
 
+The prime row is deleted as a model, whichever revision you call `delete()`
+on, so `deleting`, `deleted` and (with soft deletes) `trashed` fire on the
+prime row, and observers such as Laravel Scout's hear about it. A `deleting`
+listener returning `false` stops the delete. If the prime row is already gone,
+`delete()` returns `null` and fires nothing.
+
+Only the prime row is marked deleted; later revisions are left as they are.
+To tell whether a chain is deleted, check its prime row.
+
 ## Testing
 
 ```bash
