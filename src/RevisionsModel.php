@@ -198,13 +198,25 @@ abstract class RevisionsModel extends Model
      * Creates a new record and sets prime equal to its own id, starting a
      * new revision chain.
      *
+     * The id only exists after the insert, so the row is written twice.
+     * Both writes are quiet; `created` and `saved` are then fired once each,
+     * on the finished row. Listeners never see a revision without its prime,
+     * and `saved` (which Scout syncs on) fires once rather than twice.
+     * `saving`, `creating`, `updating` and `updated` are not fired.
+     *
      * @return static
      */
     public static function new(array $args): static
     {
-        $new = static::create($args);
+        $new = new static($args);
+        $new->saveQuietly();
         $new->prime = $new->id;
-        $new->save();
+        $new->saveQuietly();
+
+        // not halting, as Eloquent fires them: a listener's return value
+        // must not stop the listeners after it
+        $new->fireModelEvent('created', false);
+        $new->fireModelEvent('saved', false);
 
         return $new;
     }
