@@ -1,5 +1,6 @@
 # Exclude development files from dist installs (composer require downloads less)
 /.gitattributes export-ignore
+/.github export-ignore
 /.gitignore export-ignore
 /phpunit.xml export-ignore
 /tests export-ignore
