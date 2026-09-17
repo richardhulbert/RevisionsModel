@@ -102,10 +102,17 @@ Page::allLatest(3)->get();  // ... on branch 3
 ### Relations
 
 ```php
-$revision->prime;    // the first record of the chain
 $revision->branch;   // the branch (even if soft-deleted)
 $revision->owner;    // the author (even if soft-deleted)
 ```
+
+`$revision->prime` is the chain's id, an integer, not a relation. To fetch
+the chain's first row, query it: `Page::find($revision->prime)`.
+
+Never give a relation (or any public method) the same name as a column. When
+that column is missing from a model's attributes, Eloquent resolves the
+method as a relation instead, and a relation that reads its own missing
+column recurses until memory runs out.
 
 To point at another revisioned model, store its `prime` in a column and use
 `hasOneRevision()` — an eager-loadable hasOne that resolves to the latest

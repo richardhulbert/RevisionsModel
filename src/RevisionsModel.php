@@ -139,14 +139,6 @@ abstract class RevisionsModel extends Model
     }
 
     /**
-     * This returns the prime record of any RevisionsModel.
-     */
-    public function prime(): HasOne
-    {
-        return $this->hasOne(static::class, 'id', 'prime');
-    }
-
-    /**
      * The branch this revision was made on, even if the branch has since
      * been (soft) deleted.
      */
@@ -250,7 +242,7 @@ abstract class RevisionsModel extends Model
             return parent::delete();
         }
 
-        return $this->prime()->delete();
+        return static::whereKey($this->prime)->delete();
     }
 
     /**

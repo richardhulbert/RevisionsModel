@@ -88,14 +88,14 @@ class RevisionsModelTest extends TestCase
         $this->assertSame($public->id, $post->lastRevision()->first()->id);
     }
 
-    public function test_prime_branch_and_owner_relations(): void
+    public function test_prime_is_the_chain_id_and_branch_and_owner_relations(): void
     {
         $user = $this->actingAsUserOnBranch(2);
 
         $post = Post::new(['title' => 'v1']);
         $revision = $post->update(['title' => 'v2']);
 
-        $this->assertSame($post->id, $revision->prime()->first()->id);
+        $this->assertSame($post->id, $revision->prime);
         $this->assertSame('draft', $revision->branch->name);
         $this->assertSame($user->id, $revision->owner->id);
     }
