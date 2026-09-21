@@ -267,6 +267,40 @@ abstract class RevisionsModel extends Model
     }
 
     /**
+     * The current revision of each live chain whose $column equals $value.
+     *
+     * "Current" = the latest live revision on the authenticated user's branch,
+     * falling back per chain to the public branch. "Live" = the chain's prime
+     * row is not soft-deleted. "Current" is decided before $value is compared,
+     * so a renamed record matches its new value only.
+     *
+     * Adds no join, so further unqualified clauses stay unambiguous.
+     *
+     * $column is interpolated into SQL: developer-supplied column names only,
+     * never request input. $value is bound.
+     */
+    public function scopeCurrentWhere(Builder $query, string $column, mixed $value): Builder
+    {
+        $table = $this->getTable();
+        $branch = static::authBranchId() ?? static::publicBranchId();
+        $public = static::publicBranchId();
+
+        return $query
+            ->where("{$table}.{$column}", $value)
+            // the chain is live: its prime row is not soft-deleted
+            ->whereExists(fn ($q) => $q->from("{$table} as chain_prime")
+                ->whereColumn('chain_prime.id', "{$table}.prime")
+                ->whereNull('chain_prime.deleted_at'))
+            // and this row is the chain's current revision
+            ->whereRaw("{$table}.id = COALESCE(
+                (SELECT MAX(r.id) FROM {$table} r
+                  WHERE r.prime = {$table}.prime AND r.branch_id = ? AND r.deleted_at IS NULL),
+                (SELECT MAX(r.id) FROM {$table} r
+                  WHERE r.prime = {$table}.prime AND r.branch_id = ? AND r.deleted_at IS NULL)
+            )", [$branch, $public]);
+    }
+
+    /**
      * Retrieve the latest revision of every record (chain) on a branch.
      *
      * @param int|null $branch defaults to the public branch

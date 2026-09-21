@@ -134,6 +134,69 @@ class Page extends RevisionsModel
 
 Page::with('templateOnBranch')->get();  // works with with()/load()
 ```
+## Finding the current revision by value: `currentWhere()`
+
+*Since 0.6.0.*
+
+```php
+$page = Page::currentWhere('slug', '/about')->firstOrFail();
+```
+
+`currentWhere($column, $value)` returns the **current revision** of every **live chain**
+whose `$column` equals `$value`.
+
+- **Current** means the latest live revision on the authenticated user's branch. A chain with
+  no revision on that branch falls back to its latest revision on the public branch. The
+  fallback is decided per chain, so one query can return a draft of one record and the
+  published version of another.
+- **Live** means the chain's prime row is not soft-deleted. Deleting a record soft-deletes its
+  prime and leaves the later revisions untouched, because a revision is never mutated. This
+  check is what hides them.
+- A revision soft-deleted on its own is skipped, and its chain falls back to the previous live
+  revision.
+
+To list every current record, use `allLatest()`. To find records by a value, use
+`currentWhere()`.
+
+### Why not just `where()`?
+
+A chain is a history, and its older rows keep their old values.
+`Page::where('slug', '/about')` matches every revision that ever had that slug, so a page
+renamed from `/about` to `/company` is still found at `/about`.
+
+`currentWhere()` decides which revision is current *before* it compares the value. A renamed
+record matches its new value only, and the old value is free for another record to use.
+
+Matching against the prime row with `whereColumn('id', 'prime')` has the opposite fault: the
+prime carries the value the record was *created* with, so a rename is never seen.
+
+### Composing
+
+It is an ordinary scope, so you can add clauses, order and paginate. It adds no join, so
+unqualified column names stay unambiguous.
+
+```php
+Page::currentWhere('template_id', $template->prime)
+    ->where('status', '>', 0)
+    ->get();
+```
+
+### The branch
+
+The branch comes from the authenticated user's branch attribute
+(`revisions.user_branch_attribute`), the same source `update()` uses. An unauthenticated
+request sees the public branch only.
+
+### Safety
+
+`$column` is interpolated into SQL. Pass only column names written in your own code, never
+request input. `$value` is always bound.
+
+### Performance
+
+Each candidate row runs two small correlated subqueries. The value filter narrows the
+candidates first, and an index on `(prime, branch_id, id)` keeps the subqueries cheap.
+
 
 ### Deleting
 
