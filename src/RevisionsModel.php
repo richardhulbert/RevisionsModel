@@ -277,10 +277,12 @@ abstract class RevisionsModel extends Model
         $table = (new static)->getTable();
 
         return static::with('branch')->whereIn('id', function ($query) use ($table, $branch) {
-            $query->select(DB::raw('MAX(id)'))
-                ->where('branch_id', '=', $branch)
-                ->from($table)
-                ->groupBy('prime');
+            $query->select(DB::raw('MAX(T.id)'))
+                ->join("$table AS T1",  'T.prime', '=',  'T1.id')
+                ->where('T.branch_id', '=', $branch)
+                ->whereNull('T1.deleted_at')
+                ->from("$table AS T")
+                ->groupBy('T.prime');
         });
     }
 }

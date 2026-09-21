@@ -153,6 +153,20 @@ listener returning `false` stops the delete. If the prime row is already gone,
 Only the prime row is marked deleted; later revisions are left as they are.
 To tell whether a chain is deleted, check its prime row.
 
+`allLatest()` does this check but be careful if you are searching for a model you will need to include a join to an alias to the table this:
+```sql
+SELECT
+	T.*
+FROM
+	`some_table` T
+	INNER JOIN `some_table` as T1 on T1.id = T.prime
+WHERE
+	T.`slug` = '/about' AND T1.deleted_at IS NUlL
+```
+
+At the moment `LastRevision()` a scoped method does not look at the parent prime to check if it is deleted!
+This is by design it is a method on a hydrated model so at that point we assume the application has checked to see if the model is 'deleted'
+
 ## Testing
 
 ```bash

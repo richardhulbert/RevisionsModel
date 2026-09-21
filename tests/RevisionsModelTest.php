@@ -151,6 +151,26 @@ class RevisionsModelTest extends TestCase
         $this->assertSame([$draft->id], Post::allLatest(2)->pluck('id')->all());
     }
 
+    public function test_all_latest_excludes_a_deleted_chain(): void
+    {
+        $this->actingAsUserOnBranch(2);
+
+        $a = Post::new(['title' => 'a1', 'branch_id' => 1]);
+        $a2 = $a->update(['title' => 'a2', 'branch_id' => 1]);
+        $a->update(['title' => 'a3 draft']); // branch 2
+        $b = Post::new(['title' => 'b1', 'branch_id' => 1]);
+
+        // deleting a revision soft-deletes the prime, leaving the rest of the
+        // chain's rows in place - the whole chain must drop out of allLatest
+        $a2->delete();
+
+        $this->assertSoftDeleted('posts', ['id' => $a->id]);
+        $this->assertNotSoftDeleted('posts', ['id' => $a2->id]);
+
+        $this->assertSame([$b->id], Post::allLatest()->pluck('id')->all());
+        $this->assertSame([], Post::allLatest(2)->pluck('id')->all());
+    }
+
     public function test_deleting_the_prime_deletes_it(): void
     {
         $post = Post::new(['title' => 'v1']);
