@@ -19,6 +19,11 @@ A "record" as the rest of your app sees it is identified by its `prime`;
 the individual rows are its revisions. The newest row per branch is the
 current state of that record on that branch.
 
+## Requirements
+
+- PHP 8.4+
+- Laravel 12 or 13 (since 0.7.0; use 0.6.x for Laravel 10 or 11)
+
 ## Installation
 
 ```bash
